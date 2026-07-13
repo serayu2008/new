@@ -68,6 +68,8 @@
             font-weight: bold;
             color: #4a5568;
             z-index: 10;
+            text-align: center;
+            padding: 20px;
         }
 
         .insight-box {
@@ -114,7 +116,7 @@
         <ul>
             <li><strong>여름철 (우측 상단):</strong> 평균 기온이 25℃ 이상으로 올라갈 때 냉방 부하로 인해 최고 전력수요가 급격히 우상향하는지 확인합니다.</li>
             <li><strong>겨울철 (좌측 상단):</strong> 평균 기온이 영하권으로 떨어질 때 난방 수요로 인해 전력수요 피크가 다시 치솟는지 확인합니다.</li>
-            <li><strong>봄·가을철 (중앙 하단):</strong> 기온이 온화한 15℃ 내외일 때 전력수요가 가장 낮게 안정화되는 **'U자형(또는 V자형) 분포'**가 나타나는지 관찰해 보세요.</li>
+            <li><strong>봄·가을철 (중앙 하단):</strong> 기온이 온화한 15℃ 내외일 때 전력수요가 가장 낮게 안정화되는 **'U자형 분포'**가 나타나는지 관찰해 보세요.</li>
         </ul>
     </div>
 </div>
@@ -124,7 +126,12 @@
     let rawPowerData = {};
     let chartInstance = null;
 
-    // 파일 업로드 이벤트 리스너 설정
+    // 날짜 텍스트에서 숫자만 추출하여 YYYYMMDD 형태로 통일하는 함수 (매칭 실패 방지)
+    function cleanDateKey(dateStr) {
+        if (!dateStr) return '';
+        return dateStr.replace(/[^0-9]/g, '').trim(); 
+    }
+
     document.getElementById('upload-temp').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
         Papa.parse(e.target.files[0], {
@@ -148,12 +155,11 @@
         });
     });
 
-    // 1. 기온 데이터 정밀 파싱 (공백 및 탭문자 완벽 제거)
     function parseTemperature(data) {
         let isHeaderFound = false;
         data.forEach(row => {
             if (!row[0]) return;
-            let firstCell = row[0].replace(/\s+/g, '').trim(); // 탭(\t) 및 모든 공백 제거
+            let firstCell = row[0].trim();
             
             if (firstCell.includes('날짜')) {
                 isHeaderFound = true;
@@ -161,23 +167,23 @@
             }
             
             if (isHeaderFound) {
-                // 날짜 형태(YYYY-MM-DD)만 깔끔하게 보정 추출
-                let cleanDate = firstCell.replace(/[^0-9-]/g, ''); 
-                if (cleanDate.length >= 10) {
-                    rawTempData[cleanDate] = parseFloat(row[2]); // index 2: 평균기온(℃)
+                let key = cleanDateKey(firstCell);
+                if (key.length === 8) {
+                    rawTempData[key] = {
+                        avg: parseFloat(row[2]),
+                        displayDate: firstCell.replace(/\s+/g, '') // 툴팁 표시용 원본 날짜
+                    };
                 }
             }
         });
     }
 
-    // 2. 전력 데이터 파싱 및 당일 '최고치' 계산
     function parsePowerDemand(data) {
         data.forEach(row => {
             if (!row['날짜']) return;
-            let cleanDate = row['날짜'].replace(/\s+/g, '').trim();
+            let key = cleanDateKey(row['날짜']);
             
             let maxPowerOfDay = 0;
-            // 1시부터 24시까지 중 가장 높은 전력수요값(최고치) 찾기
             for (let i = 1; i <= 24; i++) {
                 let hourKey = `${i}시`;
                 if (row[hourKey]) {
@@ -187,52 +193,46 @@
                     }
                 }
             }
-            if (maxPowerOfDay > 0) {
-                rawPowerData[cleanDate] = maxPowerOfDay;
+            if (maxPowerOfDay > 0 && key.length === 8) {
+                rawPowerData[key] = maxPowerOfDay;
             }
         });
     }
 
-    // 3. 두 데이터가 다 들어왔는지 체크 후 시각화
     function checkAndRender() {
-        const tempKeys = Object.keys(rawTempData).length;
-        const powerKeys = Object.keys(rawPowerData).length;
+        const tempCount = Object.keys(rawTempData).length;
+        const powerCount = Object.keys(rawPowerData).length;
 
-        if (tempKeys > 0 && powerKeys === 0) {
-            document.getElementById('status-panel').innerText = "기온 데이터 완료! 이제 전력 데이터(power.csv)를 추가해 주세요.";
+        if (tempCount > 0 && powerCount === 0) {
+            document.getElementById('status-panel').innerText = "기온 데이터 로드 완료 (" + tempCount + "건)! 이제 전력 데이터(power.csv)를 추가해 주세요.";
             return;
         }
-        if (tempKeys === 0 && powerKeys > 0) {
-            document.getElementById('status-panel').innerText = "전력 데이터 완료! 이제 기온 데이터(temp.csv)를 추가해 주세요.";
+        if (tempCount === 0 && powerCount > 0) {
+            document.getElementById('status-panel').innerText = "전력 데이터 로드 완료 (" + powerCount + "건)! 이제 기온 데이터(temp.csv)를 추가해 주세요.";
             return;
         }
 
-        // 두 데이터가 모두 로드되었다면 산점도 데이터 생성
+        // 두 데이터 융합 및 매칭
         let scatterDataset = [];
-        
-        Object.keys(rawPowerData).forEach(date => {
-            if (rawTempData[date] !== undefined) {
+        Object.keys(rawPowerData).forEach(key => {
+            if (rawTempData[key] !== undefined) {
                 scatterDataset.push({
-                    x: rawTempData[date],      // X축: 당일 평균 기온
-                    y: rawPowerData[date],     // Y축: 당일 최고 전력수요량
-                    date: date                 // 툴팁용 날짜 저장
+                    x: rawTempData[key].avg,
+                    y: rawPowerData[key],
+                    date: rawTempData[key].displayDate
                 });
             }
         });
 
         if (scatterDataset.length === 0) {
-            document.getElementById('status-panel').innerText = "⚠️ 에러: 두 파일의 날짜 포맷이 일치하지 않아 데이터를 매칭할 수 없습니다.";
+            document.getElementById('status-panel').innerHTML = "⚠️ 데이터 매칭 실패<br>두 파일의 날짜가 일치하지 않습니다. 파일 내용을 다시 확인해 주세요.";
             return;
         }
 
-        // 로딩 패널 숨기기
         document.getElementById('status-panel').style.display = 'none';
-        
-        // 차트 그리기
         drawChart(scatterDataset);
     }
 
-    // 4. Chart.js를 이용한 산점도 구현
     function drawChart(dataset) {
         if (chartInstance) {
             chartInstance.destroy();
@@ -243,9 +243,9 @@
             type: 'scatter',
             data: {
                 datasets: [{
-                    label: '일별 데이터 (365일)',
+                    label: '2025년 일별 데이터 (365일)',
                     data: dataset,
-                    backgroundColor: 'rgba(49, 130, 206, 0.6)', // 반투명 파란색으로 밀집도 표현
+                    backgroundColor: 'rgba(49, 130, 206, 0.6)',
                     borderColor: '#2b6cb0',
                     pointRadius: 5,
                     hoverRadius: 7
