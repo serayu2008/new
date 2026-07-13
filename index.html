@@ -11,7 +11,7 @@
             font-family: 'Malgun Gothic', sans-serif;
             background-color: #f7fafc;
             margin: 0;
-            padding: 30px;
+            padding: 25px;
             color: #2d3748;
         }
         .container {
@@ -24,43 +24,23 @@
         }
         header {
             text-align: center;
-            margin-bottom: 30px;
-        }
-        h1 { margin: 0 0 10px 0; font-size: 24px; color: #1a202c; }
-        p { margin: 0; color: #718096; font-size: 14px; }
-        
-        .upload-section {
-            background-color: #f7fafc;
-            border: 2px dashed #e2e8f0;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
             margin-bottom: 25px;
         }
-        .file-inputs {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-top: 15px;
-        }
-        .file-box {
-            background: #fff;
-            padding: 10px 15px;
-            border: 1px solid #cbd5e0;
-            border-radius: 6px;
-            font-size: 13px;
-        }
-        .file-box label { font-weight: bold; display: block; margin-bottom: 5px; color: #4a5568; }
+        h1 { margin: 0 0 8px 0; font-size: 24px; color: #1a202c; }
+        p { margin: 0; color: #718096; font-size: 14px; }
 
         .chart-container {
             position: relative;
-            height: 500px;
-            margin-bottom: 25px;
+            height: 550px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
         }
         .status-message {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.95);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -68,184 +48,155 @@
             font-weight: bold;
             color: #4a5568;
             z-index: 10;
-            text-align: center;
-            padding: 20px;
         }
-
-        .insight-box {
-            background-color: #f0fff4;
-            border: 1px solid #c6f6d5;
-            padding: 15px;
-            border-radius: 8px;
-            color: #22543d;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-        .insight-box ul { margin: 5px 0 0 0; padding-left: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>📊 2025년 기온 변동에 따른 최고 전력수요 상관관계 분석</h1>
-        <p>평균 기온이 변할 때, 하루 중 가장 높은 전력 피크치(최고 전력수요)가 어떻게 분포하는지 시각화합니다.</p>
+        <h1>📊 2025년 기온 변동에 따른 일일 최고 전력수요 상관관계 분석</h1>
+        <p>temp.csv와 power.csv 데이터를 자동으로 매칭하여 365일간의 상관관계 산점도를 시각화합니다.</p>
     </header>
 
-    <div class="upload-section">
-        <strong>📁 컴퓨터에 있는 두 CSV 파일을 선택해 주세요</strong>
-        <div class="file-inputs">
-            <div class="file-box">
-                <label>1. 기온 데이터 (temp.csv)</label>
-                <input type="file" id="upload-temp" accept=".csv">
-            </div>
-            <div class="file-box">
-                <label>2. 전력 데이터 (power.csv)</label>
-                <input type="file" id="upload-power" accept=".csv">
-            </div>
-        </div>
-    </div>
-
     <div class="chart-container">
-        <div id="status-panel" class="status-message">두 CSV 파일을 모두 업로드하면 분석 차트가 자동으로 생성됩니다.</div>
+        <div id="status-panel" class="status-message">데이터 파일을 서버에서 불러오는 중입니다...</div>
         <canvas id="scatterChart"></canvas>
-    </div>
-
-    <div class="insight-box">
-        <strong>💡 데이터 시각화 해석 및 탐구 포인트 (U자형 곡선 확인하기)</strong>
-        <ul>
-            <li><strong>여름철 (우측 상단):</strong> 평균 기온이 25℃ 이상으로 올라갈 때 냉방 부하로 인해 최고 전력수요가 급격히 우상향하는지 확인합니다.</li>
-            <li><strong>겨울철 (좌측 상단):</strong> 평균 기온이 영하권으로 떨어질 때 난방 수요로 인해 전력수요 피크가 다시 치솟는지 확인합니다.</li>
-            <li><strong>봄·가을철 (중앙 하단):</strong> 기온이 온화한 15℃ 내외일 때 전력수요가 가장 낮게 안정화되는 **'U자형 분포'**가 나타나는지 관찰해 보세요.</li>
-        </ul>
     </div>
 </div>
 
 <script>
-    let rawTempData = {};
-    let rawPowerData = {};
+    // 요청하신 파일명으로 정확히 매칭
+    const URL_TEMP = "./temp.csv";
+    const URL_POWER = "./power.csv";
+
+    let tempDataset = {};  
+    let powerDataset = {}; 
     let chartInstance = null;
 
-    // 날짜 텍스트에서 숫자만 추출하여 YYYYMMDD 형태로 통일하는 함수 (매칭 실패 방지)
-    function cleanDateKey(dateStr) {
-        if (!dateStr) return '';
-        return dateStr.replace(/[^0-9]/g, '').trim(); 
-    }
-
-    document.getElementById('upload-temp').addEventListener('change', function(e) {
-        if (!e.target.files[0]) return;
-        Papa.parse(e.target.files[0], {
-            skipEmptyLines: true,
-            complete: function(results) {
-                parseTemperature(results.data);
-                checkAndRender();
-            }
-        });
+    window.addEventListener('DOMContentLoaded', () => {
+        loadDataFromServer();
     });
 
-    document.getElementById('upload-power').addEventListener('change', function(e) {
-        if (!e.target.files[0]) return;
-        Papa.parse(e.target.files[0], {
+    // 날짜 문자열에서 숫자 8자리만 추출하여 통일 (예: \t2025-01-01 -> 20250101)
+    function extractDateKey(str) {
+        if (!str) return '';
+        return str.replace(/[^0-9]/g, '').trim();
+    }
+
+    function loadDataFromServer() {
+        let tReady = false;
+        let pReady = false;
+
+        // 1. 기온 파일 자동 로드
+        Papa.parse(URL_TEMP, {
+            download: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                parseTempData(results.data);
+                tReady = true;
+                checkAndRender(tReady, pReady);
+            },
+            error: function(err) {
+                document.getElementById('status-panel').innerText = "❌ temp.csv 파일을 불러오지 못했습니다. 파일명을 확인해 주세요.";
+                console.error(err);
+            }
+        });
+
+        // 2. 전력 파일 자동 로드
+        Papa.parse(URL_POWER, {
+            download: true,
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                parsePowerDemand(results.data);
-                checkAndRender();
+                parsePowerData(results.data);
+                pReady = true;
+                checkAndRender(tReady, pReady);
+            },
+            error: function(err) {
+                document.getElementById('status-panel').innerText = "❌ power.csv 파일을 불러오지 못했습니다. 파일명을 확인해 주세요.";
+                console.error(err);
             }
         });
-    });
+    }
 
-    function parseTemperature(data) {
-        let isHeaderFound = false;
-        data.forEach(row => {
+    function parseTempData(rows) {
+        let headerPassed = false;
+        rows.forEach(row => {
             if (!row[0]) return;
-            let firstCell = row[0].trim();
+            let cell = row[0].trim();
             
-            if (firstCell.includes('날짜')) {
-                isHeaderFound = true;
+            if (cell.includes('날짜')) {
+                headerPassed = true;
                 return;
             }
             
-            if (isHeaderFound) {
-                let key = cleanDateKey(firstCell);
-                if (key.length === 8) {
-                    rawTempData[key] = {
-                        avg: parseFloat(row[2]),
-                        displayDate: firstCell.replace(/\s+/g, '') // 툴팁 표시용 원본 날짜
+            if (headerPassed) {
+                let dateKey = extractDateKey(cell);
+                if (dateKey.length === 8) {
+                    tempDataset[dateKey] = {
+                        avg: parseFloat(row[2]), // 평균기온
+                        originalStr: cell.replace(/\s+/g, '') // 툴팁 표기용
                     };
                 }
             }
         });
     }
 
-    function parsePowerDemand(data) {
-        data.forEach(row => {
+    function parsePowerData(rows) {
+        rows.forEach(row => {
             if (!row['날짜']) return;
-            let key = cleanDateKey(row['날짜']);
+            let dateKey = extractDateKey(row['날짜']);
             
-            let maxPowerOfDay = 0;
+            let dailyPeak = 0;
             for (let i = 1; i <= 24; i++) {
-                let hourKey = `${i}시`;
-                if (row[hourKey]) {
-                    let val = parseInt(row[hourKey].replace(/,/g, ''));
-                    if (val > maxPowerOfDay) {
-                        maxPowerOfDay = val;
-                    }
+                let colName = `${i}시`;
+                if (row[colName]) {
+                    let val = parseInt(row[colName].replace(/,/g, ''));
+                    if (val > dailyPeak) dailyPeak = val;
                 }
             }
-            if (maxPowerOfDay > 0 && key.length === 8) {
-                rawPowerData[key] = maxPowerOfDay;
+            
+            if (dailyPeak > 0 && dateKey.length === 8) {
+                powerDataset[dateKey] = dailyPeak;
             }
         });
     }
 
-    function checkAndRender() {
-        const tempCount = Object.keys(rawTempData).length;
-        const powerCount = Object.keys(rawPowerData).length;
+    function checkAndRender(t, p) {
+        if (!t || !p) return;
 
-        if (tempCount > 0 && powerCount === 0) {
-            document.getElementById('status-panel').innerText = "기온 데이터 로드 완료 (" + tempCount + "건)! 이제 전력 데이터(power.csv)를 추가해 주세요.";
-            return;
-        }
-        if (tempCount === 0 && powerCount > 0) {
-            document.getElementById('status-panel').innerText = "전력 데이터 로드 완료 (" + powerCount + "건)! 이제 기온 데이터(temp.csv)를 추가해 주세요.";
-            return;
-        }
+        let finalScatterData = [];
 
-        // 두 데이터 융합 및 매칭
-        let scatterDataset = [];
-        Object.keys(rawPowerData).forEach(key => {
-            if (rawTempData[key] !== undefined) {
-                scatterDataset.push({
-                    x: rawTempData[key].avg,
-                    y: rawPowerData[key],
-                    date: rawTempData[key].displayDate
+        Object.keys(powerDataset).forEach(dateKey => {
+            if (tempDataset[dateKey] !== undefined) {
+                finalScatterData.push({
+                    x: tempDataset[dateKey].avg,
+                    y: powerDataset[dateKey],
+                    labelDate: tempDataset[dateKey].originalStr
                 });
             }
         });
 
-        if (scatterDataset.length === 0) {
-            document.getElementById('status-panel').innerHTML = "⚠️ 데이터 매칭 실패<br>두 파일의 날짜가 일치하지 않습니다. 파일 내용을 다시 확인해 주세요.";
+        if (finalScatterData.length === 0) {
+            document.getElementById('status-panel').innerHTML = "⚠️ 데이터 매칭 실패<br>두 파일의 날짜 형식이 일치하지 않거나 데이터가 비어있습니다.";
             return;
         }
 
         document.getElementById('status-panel').style.display = 'none';
-        drawChart(scatterDataset);
+        renderChart(finalScatterData);
     }
 
-    function drawChart(dataset) {
-        if (chartInstance) {
-            chartInstance.destroy();
-        }
-
+    function renderChart(chartData) {
         const ctx = document.getElementById('scatterChart').getContext('2d');
+        
         chartInstance = new Chart(ctx, {
             type: 'scatter',
             data: {
                 datasets: [{
-                    label: '2025년 일별 데이터 (365일)',
-                    data: dataset,
-                    backgroundColor: 'rgba(49, 130, 206, 0.6)',
+                    label: '2025년 일별 매칭 데이터 (365일)',
+                    data: chartData,
+                    backgroundColor: 'rgba(66, 153, 225, 0.65)',
                     borderColor: '#2b6cb0',
                     pointRadius: 5,
                     hoverRadius: 7
@@ -257,14 +208,14 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: '2025년 평균 기온 변동에 따른 일일 최고 전력수요량 산점도',
+                        text: '2025년 평균 기온 변동에 따른 대한민국 최고 전력수요 상관관계 산점도',
                         font: { size: 16, weight: 'bold' }
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                let p = context.raw;
-                                return `[${p.date}] 평균기온: ${p.x}℃ | 최고전력: ${p.y.toLocaleString()} MW`;
+                                let d = context.raw;
+                                return `[${d.labelDate}] 평균기온: ${d.x}℃ | 최고전력: ${d.y.toLocaleString()} MW`;
                             }
                         }
                     }
@@ -272,11 +223,11 @@
                 scales: {
                     x: {
                         title: { display: true, text: '일평균 기온 (℃)', font: { weight: 'bold' } },
-                        grid: { color: '#e2e8f0' }
+                        grid: { color: '#edf2f7' }
                     },
                     y: {
                         title: { display: true, text: '당일 최고 전력수요량 (MW)', font: { weight: 'bold' } },
-                        grid: { color: '#e2e8f0' }
+                        grid: { color: '#edf2f7' }
                     }
                 }
             }
