@@ -61,7 +61,6 @@
             border-color: #99e9f2;
         }
 
-        /* 컨트롤러 디자인 */
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -94,10 +93,6 @@
             outline: none;
         }
 
-        select:focus, input:focus {
-            border-color: #339af0;
-        }
-
         button {
             padding: 10px 20px;
             background-color: #339af0;
@@ -115,7 +110,6 @@
             background-color: #228be6;
         }
 
-        /* 차트 영역 */
         .chart-card {
             background-color: var(--card-bg);
             padding: 25px;
@@ -126,7 +120,6 @@
             height: 500px;
         }
 
-        /* 요약 통계 영역 */
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -150,7 +143,6 @@
             margin: 0 0 8px 0;
             font-size: 0.85rem;
             color: #868e96;
-            text-transform: uppercase;
         }
 
         .summary-card p {
@@ -163,13 +155,14 @@
         .loading-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.9);
             display: flex;
             justify-content: center;
             align-items: center;
             font-weight: bold;
             font-size: 1.2rem;
             z-index: 10;
+            color: #495057;
         }
     </style>
 </head>
@@ -204,14 +197,14 @@
             <label for="target-month">조회 월</label>
             <select id="target-month">
                 <option value="all">2025년 전체</option>
-                <option value="01">1월 (한겨울)</option>
+                <option value="01">1월</option>
                 <option value="02">2월</option>
                 <option value="03">3월</option>
                 <option value="04">4월</option>
                 <option value="05">5월</option>
                 <option value="06">6월</option>
-                <option value="07">7월 (한여름)</option>
-                <option value="08">8월 (한여름)</option>
+                <option value="07">7월</option>
+                <option value="08">8월</option>
                 <option value="09">9월</option>
                 <option value="10">10월</option>
                 <option value="11">11월</option>
@@ -227,7 +220,7 @@
         <canvas id="mainChart"></canvas>
     </div>
 
-    <div class="summary-grid" id="summary-section">
+    <div class="summary-grid">
         <div class="summary-card">
             <h3 id="lbl-meta-1">선택일 평균 기온</h3>
             <p id="val-meta-1">-</p>
@@ -248,19 +241,14 @@
 </div>
 
 <script>
-    // 파일명 정의 (HTML 파일과 같은 경로)
-    const FILE_TEMP = "2025 기온.csv";
-    const FILE_POWER = "한국전력거래소_시간별 전국 전력수요량_20251231.csv";
+    // 상대 경로로 설정하여 깃허브 Pages 환경 대응
+    const FILE_TEMP = "./2025 기온.csv";
+    const FILE_POWER = "./한국전력거래소_시간별 전국 전력수요량_20251231.csv";
 
-    // 글로벌 데이터 저장소
-    let tempRawData = [];
-    let powerRawData = [];
-    let tempMap = {};  // 날짜별 기온 매핑 {"2025-01-01": {avg, min, max}}
-    let powerMap = {}; // 날짜별 전력수요 매핑 {"2025-01-01": [1시, 2시, ... 24시]}
-
+    let tempMap = {};
+    let powerMap = {};
     let chartInstance = null;
 
-    // 페이지 로드 시 파일 자동 가져오기
     window.addEventListener('DOMContentLoaded', () => {
         loadDataFiles();
         setupEventListeners();
@@ -285,20 +273,17 @@
         btnUpdate.addEventListener('click', updateVisualization);
     }
 
-    // CSV 파일 로드 및 파싱 (PapaParse)
     function loadDataFiles() {
         let tempLoaded = false;
         let powerLoaded = false;
 
-        // 1. 기온 파일 로드 (상단 7라인에 텍스트가 있으므로 skipFirstLines 혹은 파싱 후 전처리 적용)
+        // 1. 기온 파일 파싱 (상단 메타데이터가 있으므로 정밀 필터링 처리)
         Papa.parse(FILE_TEMP, {
             download: true,
-            header: true,
+            header: false, // 상단 쓰레기 데이터 때문에 우선 줄 단위 배열로 읽음
             skipEmptyLines: true,
             complete: function(results) {
-                // 상단 메타데이터 필터링하고 실제 헤더가 있는 데이터만 추출
-                const data = results.data.filter(row => row['날짜'] && row['지점']);
-                processTempData(data);
+                processTempDataRaw(results.data);
                 tempLoaded = true;
                 document.getElementById('status-temp').innerText = "기온 데이터 완료";
                 document.getElementById('status-temp').classList.add('loaded');
@@ -306,11 +291,11 @@
             },
             error: function(err) {
                 document.getElementById('status-temp').innerText = "기온 파일 오류";
-                console.error(err);
+                console.error("기온 로드 실패:", err);
             }
         });
 
-        // 2. 전력수요 파일 로드
+        // 2. 전력수요 파일 파싱
         Papa.parse(FILE_POWER, {
             download: true,
             header: true,
@@ -324,7 +309,7 @@
             },
             error: function(err) {
                 document.getElementById('status-power').innerText = "전력 파일 오류";
-                console.error(err);
+                console.error("전력 로드 실패:", err);
             }
         });
     }
@@ -332,29 +317,45 @@
     function checkAllLoaded(t, p) {
         if (t && p) {
             document.getElementById('loading').style.display = 'none';
-            updateVisualization(); // 초기 로드 시 한 번 실행
+            updateVisualization();
         }
     }
 
-    // 기온 데이터 구조화
-    function processTempData(data) {
-        data.forEach(row => {
-            // 정규식을 사용해 공백이나 탭 문자 제거하여 날짜 포맷 정리 (\t2025-01-01 -> 2025-01-01)
-            let dateKey = row['날짜'].trim();
+    // 기온 CSV 상단 7줄 메타데이터 건너뛰고 매핑 테이블 구축
+    function processTempDataRaw(lines) {
+        let headerIndex = -1;
+        
+        // '날짜'가 포함된 실제 헤더 라인 찾기
+        for(let i=0; i<lines.length; i++) {
+            if(lines[i][0] && lines[i][0].includes('날짜')) {
+                headerIndex = i;
+                break;
+            }
+        }
+
+        if(headerIndex === -1) return;
+
+        // 헤더 다음 줄부터 데이터 매핑
+        for(let i = headerIndex + 1; i < lines.length; i++) {
+            let row = lines[i];
+            if(!row[0] || row.length < 5) continue;
+
+            // 앞뒤 공백 및 탭 문자(\t) 제거
+            let dateKey = row[0].replace(/\s+/g, '').trim(); 
+            
             tempMap[dateKey] = {
-                avg: parseFloat(row['평균기온(℃)']),
-                min: parseFloat(row['최저기온(℃)']),
-                max: parseFloat(row['최고기온(℃)'])
+                avg: parseFloat(row[2]),
+                min: parseFloat(row[3]),
+                max: parseFloat(row[4])
             };
-        });
+        }
     }
 
-    // 전력 데이터 구조화
     function processPowerData(data) {
         data.forEach(row => {
-            let dateKey = row['날짜'].trim();
+            if(!row['날짜']) return;
+            let dateKey = row['날짜'].replace(/\s+/g, '').trim();
             let dayPower = [];
-            // 1시부터 24시까지 데이터 배열화
             for (let i = 1; i <= 24; i++) {
                 let val = row[`${i}시`] ? parseInt(row[`${i}시`].replace(/,/g, '')) : 0;
                 dayPower.push(val);
@@ -363,7 +364,6 @@
         });
     }
 
-    // 메인 시각화 업데이트 스위치
     function updateVisualization() {
         const mode = document.getElementById('view-mode').value;
         if (mode === 'daily-trend') {
@@ -373,7 +373,6 @@
         }
     }
 
-    // 1. 특정 날짜 24시간 분석 (이중 축 선 그래프)
     function renderDailyTrend() {
         const targetDate = document.getElementById('target-date').value;
         const hours = Array.from({length: 24}, (_, i) => `${i + 1}시`);
@@ -382,11 +381,13 @@
         const tempData = tempMap[targetDate];
 
         if (!powerData || !tempData) {
-            alert("선택한 날짜의 데이터를 찾을 수 없습니다.");
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('loading').innerText = `${targetDate} 데이터를 매칭할 수 없습니다. 파일명을 다시 확인해 주세요.`;
             return;
+        } else {
+            document.getElementById('loading').style.display = 'none';
         }
 
-        // 요약정보 대시보드 업데이트
         document.getElementById('lbl-meta-1').innerText = `${targetDate} 평균 기온`;
         document.getElementById('val-meta-1').innerText = `${tempData.avg} ℃`;
         document.getElementById('lbl-meta-2').innerText = "최저 / 최고 기온";
@@ -401,13 +402,10 @@
         document.getElementById('lbl-meta-4').innerText = "최대 전력 (시간대)";
         document.getElementById('val-meta-4').innerText = `${maxPower.toLocaleString()} MW (${maxHour}시)`;
 
-        // 기존 차트 파괴
         if (chartInstance) chartInstance.destroy();
 
-        // 24시간 가상의 온도 변화 분포 곡선 생성 (데이터 세분화 대안: 최고/최저치 활용 매칭)
-        // 여기서는 시간 변화에 따라 최저기온(새벽5시)~최고기온(오후2시) 흐름을 간단히 추정하여 데모 시각화 구현
         let simulatedHourlyTemp = hours.map((_, index) => {
-            let ratio = Math.sin((index - 6) / 24 * 2 * Math.PI) * 0.5 + 0.5; // 가상의 사인 곡선 기온 변화
+            let ratio = Math.sin((index - 6) / 24 * 2 * Math.PI) * 0.5 + 0.5;
             return Math.round((tempData.min + (tempData.max - tempData.min) * ratio) * 10) / 10;
         });
 
@@ -462,27 +460,22 @@
         });
     }
 
-    // 2. 기온과 전력수요 분산도 (산점도 분석)
     function renderScatterPlot() {
         const targetMonth = document.getElementById('target-month').value;
         let scatterData = [];
-
         let totalDays = 0;
         let sumTemp = 0;
         let sumPowerMax = 0;
 
-        // 모든 날짜 순회하며 데이터 결합
         Object.keys(tempMap).forEach(date => {
-            // 월 필터링
             if (targetMonth !== 'all' && date.split('-')[1] !== targetMonth) return;
 
             const powerData = powerMap[date];
             if (powerData) {
-                const maxPowerOfDay = Math.max(...powerData); // 당일 피크 수요
+                const maxPowerOfDay = Math.max(...powerData);
                 const avgTempOfDay = tempMap[date].avg;
 
                 scatterData.push({ x: avgTempOfDay, y: maxPowerOfDay, date: date });
-
                 sumTemp += avgTempOfDay;
                 sumPowerMax += maxPowerOfDay;
                 totalDays++;
@@ -494,7 +487,6 @@
             return;
         }
 
-        // 요약보드 통계 업데이트
         document.getElementById('lbl-meta-1').innerText = "분석 기간 평균 기온";
         document.getElementById('val-meta-1').innerText = `${(sumTemp / totalDays).toFixed(1)} ℃`;
         document.getElementById('lbl-meta-2').innerText = "분석 대상 일수";
@@ -507,18 +499,3 @@
         if (chartInstance) chartInstance.destroy();
 
         const ctx = document.getElementById('mainChart').getContext('2d');
-        chartInstance = new Chart(ctx, {
-            type: 'scatter',
-            data: {
-                datasets: [{
-                    label: '일일 최고전력 vs 평균기온',
-                    data: scatterData,
-                    backgroundColor: 'rgba(77, 173, 247, 0.7)',
-                    borderColor: '#1c7ed6',
-                    pointRadius: 5
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
