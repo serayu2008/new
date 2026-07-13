@@ -163,6 +163,8 @@
             font-size: 1.2rem;
             z-index: 10;
             color: #495057;
+            text-align: center;
+            padding: 20px;
         }
     </style>
 </head>
@@ -241,9 +243,9 @@
 </div>
 
 <script>
-    // 상대 경로로 설정하여 깃허브 Pages 환경 대응
-    const FILE_TEMP = "./2025 기온.csv";
-    const FILE_POWER = "./한국전력거래소_시간별 전국 전력수요량_20251231.csv";
+    // 영어 파일명 경로 매칭 완료
+    const FILE_TEMP = "./temp.csv";
+    const FILE_POWER = "./power.csv";
 
     let tempMap = {};
     let powerMap = {};
@@ -277,10 +279,10 @@
         let tempLoaded = false;
         let powerLoaded = false;
 
-        // 1. 기온 파일 파싱 (상단 메타데이터가 있으므로 정밀 필터링 처리)
+        // 1. 기온 파일 파싱
         Papa.parse(FILE_TEMP, {
             download: true,
-            header: false, // 상단 쓰레기 데이터 때문에 우선 줄 단위 배열로 읽음
+            header: false,
             skipEmptyLines: true,
             complete: function(results) {
                 processTempDataRaw(results.data);
@@ -321,11 +323,8 @@
         }
     }
 
-    // 기온 CSV 상단 7줄 메타데이터 건너뛰고 매핑 테이블 구축
     function processTempDataRaw(lines) {
         let headerIndex = -1;
-        
-        // '날짜'가 포함된 실제 헤더 라인 찾기
         for(let i=0; i<lines.length; i++) {
             if(lines[i][0] && lines[i][0].includes('날짜')) {
                 headerIndex = i;
@@ -335,12 +334,10 @@
 
         if(headerIndex === -1) return;
 
-        // 헤더 다음 줄부터 데이터 매핑
         for(let i = headerIndex + 1; i < lines.length; i++) {
             let row = lines[i];
             if(!row[0] || row.length < 5) continue;
 
-            // 앞뒤 공백 및 탭 문자(\t) 제거
             let dateKey = row[0].replace(/\s+/g, '').trim(); 
             
             tempMap[dateKey] = {
@@ -382,7 +379,7 @@
 
         if (!powerData || !tempData) {
             document.getElementById('loading').style.display = 'flex';
-            document.getElementById('loading').innerText = `${targetDate} 데이터를 매칭할 수 없습니다. 파일명을 다시 확인해 주세요.`;
+            document.getElementById('loading').innerText = `${targetDate} 데이터를 매칭할 수 없습니다. 파일 구성을 점검해 주세요.`;
             return;
         } else {
             document.getElementById('loading').style.display = 'none';
@@ -499,3 +496,38 @@
         if (chartInstance) chartInstance.destroy();
 
         const ctx = document.getElementById('mainChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: '일일 최고전력 vs 평균기온',
+                    data: scatterData,
+                    backgroundColor: 'rgba(77, 173, 247, 0.7)',
+                    borderColor: '#1c7ed6',
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: '기온 변동에 따른 전력 피크 수요 분포 (상관관계)' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let raw = context.raw;
+                                return `[${raw.date}] 평균기온: ${raw.x}℃, 최대수요: ${raw.y.toLocaleString()} MW`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: '일평균 기온 (℃)' } },
+                    y: { title: { display: true, text: '당일 최대 전력수요량 (MW)' } }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
