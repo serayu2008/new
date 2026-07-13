@@ -3,527 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2025 기온 및 전력수요량 분석 시스템</title>
+    <title>2025 기온 및 전력수요 분석</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --bg-color: #f8f9fa;
-            --card-bg: #ffffff;
-            --text-color: #212529;
-            --primary: #4dadf7;
-            --secondary: #ff8787;
-            --border-color: #dee2e6;
-        }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f4f6f9;
             margin: 0;
             padding: 20px;
+            color: #333;
         }
-
         .container {
-            max-width: 1200px;
+            max-width: 1100px;
             margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
-
         header {
             text-align: center;
             margin-bottom: 30px;
+            border-bottom: 2px solid #edf2f7;
+            padding-bottom: 20px;
         }
-
-        h1 {
-            color: #343a40;
-            margin-bottom: 10px;
-        }
-
-        .status-container {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .status-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            font-size: 0.9rem;
-            font-weight: bold;
-        }
-
-        .status-badge.loaded {
-            background-color: #e3fafc;
-            color: #0b7285;
-            border-color: #99e9f2;
+        h1 { margin: 0 0 10px 0; color: #2d3748; font-size: 26px; }
+        p { margin: 0; color: #718096; }
+        
+        .setup-box {
+            background-color: #ebf8ff;
+            border: 1px solid #bee3f8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            text-align: center;
         }
 
         .controls {
             display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            background-color: var(--card-bg);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            justify-content: center;
+            gap: 20px;
             margin-bottom: 25px;
-            align-items: center;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #495057;
-        }
-
-        select, input {
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            font-size: 0.95rem;
-            outline: none;
-        }
-
-        button {
-            padding: 10px 20px;
-            background-color: #339af0;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            align-self: flex-end;
-            margin-top: auto;
-            transition: background-color 0.2s;
-        }
-
-        button:hover {
-            background-color: #228be6;
-        }
-
-        .chart-card {
-            background-color: var(--card-bg);
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 25px;
-            position: relative;
-            height: 500px;
-        }
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .summary-card {
-            background-color: var(--card-bg);
+            background: #f7fafc;
             padding: 15px;
             border-radius: 8px;
-            border-left: 5px solid #339af0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
-
-        .summary-card:nth-child(2) { border-left-color: #ff922b; }
-        .summary-card:nth-child(3) { border-left-color: #fab005; }
-        .summary-card:nth-child(4) { border-left-color: #fa5252; }
-
-        .summary-card h3 {
-            margin: 0 0 8px 0;
-            font-size: 0.85rem;
-            color: #868e96;
-        }
-
-        .summary-card p {
-            margin: 0;
-            font-size: 1.4rem;
+        .control-group { display: flex; align-items: center; gap: 10px; }
+        label { font-weight: bold; color: #4a5568; }
+        select, input { padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; }
+        button { 
+            padding: 8px 16px; 
+            background: #3182ce; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
             font-weight: bold;
-            color: #343a40;
         }
+        button:hover { background: #2b6cb0; }
 
-        .loading-overlay {
+        .chart-container {
+            position: relative;
+            height: 450px;
+            margin-bottom: 30px;
+        }
+        
+        .loading {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.9);
+            top:0; left:0; right:0; bottom:0;
+            background: rgba(255,255,255,0.85);
             display: flex;
             justify-content: center;
             align-items: center;
+            font-size: 18px;
             font-weight: bold;
-            font-size: 1.2rem;
-            z-index: 10;
-            color: #495057;
-            text-align: center;
-            padding: 20px;
+            color: #4a5568;
+            z-index: 5;
         }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .info-card {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3182ce;
+        }
+        .info-card h3 { margin: 0 0 10px 0; font-size: 16px; color: #4a5568; }
+        .info-card p { font-size: 20px; font-weight: bold; color: #2d3748; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>2025 기온 vs 전력수요 분석 시스템</h1>
-        <p>전력거래소 시간별 전국 전력수요량 및 기상청 서울 기온 데이터 융합 시각화</p>
-        
-        <div class="status-container">
-            <div id="status-temp" class="status-badge">기온 데이터 로딩 중...</div>
-            <div id="status-power" class="status-badge">전력 데이터 로딩 중...</div>
-        </div>
+        <h1>2025년 기온 변동에 따른 전력수요 영향 분석</h1>
+        <p>기상청 서울 기온 데이터 및 전력거래소 전국 시간별 전력수요량 융합 시각화</p>
     </header>
+
+    <div class="setup-box">
+        <strong>🌐 배포 환경 자동 로드 지원</strong> (만약 무한 로딩 발생 시 아래 버튼으로 파일을 각각 지정해 주셔도 바로 작동합니다.)
+        <div style="margin-top: 10px; display: flex; justify-content: center; gap: 15px; font-size: 13px;">
+            <label>기온(temp): <input type="file" id="local-temp" accept=".csv"></label>
+            <label>전력(power): <input type="file" id="local-power" accept=".csv"></label>
+        </div>
+    </div>
 
     <div class="controls">
         <div class="control-group">
-            <label for="view-mode">분석 모드</label>
-            <select id="view-mode">
-                <option value="daily-trend">특정 날짜의 24시간 추이 분석</option>
-                <option value="monthly-scatter">월별 기온-전력수요 상관관계 (산점도)</option>
-            </select>
+            <label for="date-select">분석 대상 날짜 선택:</label>
+            <input type="date" id="date-select" min="2025-01-01" max="2025-12-31" value="2025-01-01">
         </div>
-
-        <div class="control-group" id="date-group">
-            <label for="target-date">조회 날짜</label>
-            <input type="date" id="target-date" min="2025-01-01" max="2025-12-31" value="2025-01-01">
-        </div>
-
-        <div class="control-group" id="month-group" style="display: none;">
-            <label for="target-month">조회 월</label>
-            <select id="target-month">
-                <option value="all">2025년 전체</option>
-                <option value="01">1월</option>
-                <option value="02">2월</option>
-                <option value="03">3월</option>
-                <option value="04">4월</option>
-                <option value="05">5월</option>
-                <option value="06">6월</option>
-                <option value="07">7월</option>
-                <option value="08">8월</option>
-                <option value="09">9월</option>
-                <option value="10">10월</option>
-                <option value="11">11월</option>
-                <option value="12">12월</option>
-            </select>
-        </div>
-
-        <button id="btn-update">분석하기</button>
+        <button id="btn-analyze">데이터 분석하기</button>
     </div>
 
-    <div class="chart-card">
-        <div id="loading" class="loading-overlay">데이터를 불러오는 중입니다...</div>
-        <canvas id="mainChart"></canvas>
+    <div class="chart-container">
+        <div id="loading-spinner" class="loading">데이터 파일을 불러오는 중입니다...</div>
+        <canvas id="analysisChart"></canvas>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <h3 id="lbl-meta-1">선택일 평균 기온</h3>
-            <p id="val-meta-1">-</p>
+    <div class="info-grid">
+        <div class="info-card">
+            <h3>선택일 기온 요약 (서울시 기준)</h3>
+            <p id="info-temp">평균: - ℃ (최저: - ℃ / 최고: - ℃)</p>
         </div>
-        <div class="summary-card">
-            <h3 id="lbl-meta-2">최저 / 최고 기온</h3>
-            <p id="val-meta-2">-</p>
-        </div>
-        <div class="summary-card">
-            <h3 id="lbl-meta-3">하루 총 전력수요량</h3>
-            <p id="val-meta-3">-</p>
-        </div>
-        <div class="summary-card">
-            <h3 id="lbl-meta-4">최대 전력수요 (시간)</h3>
-            <p id="val-meta-4">-</p>
+        <div class="info-card" style="border-left-color: #e53e3e;">
+            <h3>선택일 전력수요 요약 (전국 기준)</h3>
+            <p id="info-power">일일 총량: - MW (최대 전력: - MW)</p>
         </div>
     </div>
 </div>
 
 <script>
-    // 영어 파일명 경로 매칭 완료
-    const FILE_TEMP = "./temp.csv";
-    const FILE_POWER = "./power.csv";
+    // 대소문자 매칭 오류를 피하기 위한 파일명 목록 선언 (소문자 우선 시도)
+    let tempUrl = "./temp.csv";
+    let powerUrl = "./power.csv";
 
-    let tempMap = {};
-    let powerMap = {};
-    let chartInstance = null;
+    let globalTempData = {};
+    let globalPowerData = {};
+    let myChart = null;
 
     window.addEventListener('DOMContentLoaded', () => {
-        loadDataFiles();
-        setupEventListeners();
+        startServerLoading();
+        setupEvents();
     });
 
-    function setupEventListeners() {
-        const viewMode = document.getElementById('view-mode');
-        const dateGroup = document.getElementById('date-group');
-        const monthGroup = document.getElementById('month-group');
-        const btnUpdate = document.getElementById('btn-update');
-
-        viewMode.addEventListener('change', (e) => {
-            if (e.target.value === 'daily-trend') {
-                dateGroup.style.display = 'flex';
-                monthGroup.style.display = 'none';
-            } else {
-                dateGroup.style.display = 'none';
-                monthGroup.style.display = 'flex';
-            }
+    function setupEvents() {
+        document.getElementById('btn-analyze').addEventListener('click', renderChart);
+        
+        // 로컬 파일 수동 업로드 이벤트 안전장치 추가
+        document.getElementById('local-temp').addEventListener('change', (e) => {
+            Papa.parse(e.target.files[0], {
+                skipEmptyLines: true,
+                complete: function(results) { processTemp(results.data); checkDataReady(); }
+            });
         });
-
-        btnUpdate.addEventListener('click', updateVisualization);
+        document.getElementById('local-power').addEventListener('change', (e) => {
+            Papa.parse(e.target.files[0], {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) { processPower(results.data); checkDataReady(); }
+            });
+        });
     }
 
-    function loadDataFiles() {
-        let tempLoaded = false;
-        let powerLoaded = false;
+    // 서버 호스팅 파일 로드 함수
+    function startServerLoading() {
+        let tReady = false;
+        let pReady = false;
 
-        // 1. 기온 파일 파싱
-        Papa.parse(FILE_TEMP, {
+        // 1. 기온 파일 로드
+        Papa.parse(tempUrl, {
             download: true,
-            header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                processTempDataRaw(results.data);
-                tempLoaded = true;
-                document.getElementById('status-temp').innerText = "기온 데이터 완료";
-                document.getElementById('status-temp').classList.add('loaded');
-                checkAllLoaded(tempLoaded, powerLoaded);
+                processTemp(results.data);
+                tReady = true;
+                checkDataReady(tReady, pReady);
             },
-            error: function(err) {
-                document.getElementById('status-temp').innerText = "기온 파일 오류";
-                console.error("기온 로드 실패:", err);
+            error: function() {
+                // 소문자 실패시 대문자로 2차 시도
+                Papa.parse("./temp.CSV", {
+                    download: true,
+                    skipEmptyLines: true,
+                    complete: function(res) { processTemp(res.data); tReady = true; checkDataReady(tReady, pReady); }
+                });
             }
         });
 
-        // 2. 전력수요 파일 파싱
-        Papa.parse(FILE_POWER, {
+        // 2. 전력 파일 로드
+        Papa.parse(powerUrl, {
             download: true,
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                processPowerData(results.data);
-                powerLoaded = true;
-                document.getElementById('status-power').innerText = "전력 데이터 완료";
-                document.getElementById('status-power').classList.add('loaded');
-                checkAllLoaded(tempLoaded, powerLoaded);
+                processPower(results.data);
+                pReady = true;
+                checkDataReady(tReady, pReady);
             },
-            error: function(err) {
-                document.getElementById('status-power').innerText = "전력 파일 오류";
-                console.error("전력 로드 실패:", err);
+            error: function() {
+                // 소문자 실패시 대문자로 2차 시도
+                Papa.parse("./power.CSV", {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(res) { processPower(res.data); pReady = true; checkDataReady(tReady, pReady); }
+                });
             }
         });
     }
 
-    function checkAllLoaded(t, p) {
-        if (t && p) {
-            document.getElementById('loading').style.display = 'none';
-            updateVisualization();
+    function checkDataReady(t, p) {
+        if((t && p) || (Object.keys(globalTempData).length > 0 && Object.keys(globalPowerData).length > 0)) {
+            document.getElementById('loading-spinner').style.display = 'none';
+            renderChart();
         }
     }
 
-    function processTempDataRaw(lines) {
-        let headerIndex = -1;
-        for(let i=0; i<lines.length; i++) {
-            if(lines[i][0] && lines[i][0].includes('날짜')) {
-                headerIndex = i;
-                break;
-            }
-        }
-
-        if(headerIndex === -1) return;
-
-        for(let i = headerIndex + 1; i < lines.length; i++) {
-            let row = lines[i];
-            if(!row[0] || row.length < 5) continue;
-
-            let dateKey = row[0].replace(/\s+/g, '').trim(); 
+    // 기온 가공 (\t 및 메타라인 예외 처리 강화)
+    function processTemp(data) {
+        let isDataSection = false;
+        data.forEach(row => {
+            if (!row[0]) return;
+            let firstCell = row[0].replace(/\s+/g, '').trim();
+            if (firstCell.includes('날짜')) { isDataSection = true; return; }
             
-            tempMap[dateKey] = {
-                avg: parseFloat(row[2]),
-                min: parseFloat(row[3]),
-                max: parseFloat(row[4])
-            };
-        }
+            if (isDataSection) {
+                let cleanDate = firstCell.replace(/[^0-9-]/g, ''); // 날짜 포맷만 추출
+                if(cleanDate.length >= 10) {
+                    globalTempData[cleanDate] = {
+                        avg: parseFloat(row[2]),
+                        min: parseFloat(row[3]),
+                        max: parseFloat(row[4])
+                    };
+                }
+            }
+        });
     }
 
-    function processPowerData(data) {
+    // 전력 데이터 가공
+    function processPower(data) {
         data.forEach(row => {
             if(!row['날짜']) return;
-            let dateKey = row['날짜'].replace(/\s+/g, '').trim();
-            let dayPower = [];
-            for (let i = 1; i <= 24; i++) {
-                let val = row[`${i}시`] ? parseInt(row[`${i}시`].replace(/,/g, '')) : 0;
-                dayPower.push(val);
+            let cleanDate = row['날짜'].replace(/\s+/g, '').trim();
+            let dayArr = [];
+            for(let i=1; i<=24; i++) {
+                let key = `${i}시`;
+                let val = row[key] ? parseInt(row[key].replace(/,/g, '')) : 0;
+                dayArr.push(val);
             }
-            powerMap[dateKey] = dayPower;
+            globalPowerData[cleanDate] = dayArr;
         });
     }
 
-    function updateVisualization() {
-        const mode = document.getElementById('view-mode').value;
-        if (mode === 'daily-trend') {
-            renderDailyTrend();
-        } else {
-            renderScatterPlot();
-        }
-    }
+    // 시각화 차트 그리기
+    function renderChart() {
+        const targetDate = document.getElementById('date-select').value;
+        const tempInfo = globalTempData[targetDate];
+        const powerInfo = globalPowerData[targetDate];
 
-    function renderDailyTrend() {
-        const targetDate = document.getElementById('target-date').value;
-        const hours = Array.from({length: 24}, (_, i) => `${i + 1}시`);
-        
-        const powerData = powerMap[targetDate];
-        const tempData = tempMap[targetDate];
-
-        if (!powerData || !tempData) {
-            document.getElementById('loading').style.display = 'flex';
-            document.getElementById('loading').innerText = `${targetDate} 데이터를 매칭할 수 없습니다. 파일 구성을 점검해 주세요.`;
+        if(!tempInfo || !powerInfo) {
+            alert("선택하신 날짜의 데이터를 매칭할 수 없습니다. 파일명을 다시 확인해주세요.");
             return;
-        } else {
-            document.getElementById('loading').style.display = 'none';
         }
 
-        document.getElementById('lbl-meta-1').innerText = `${targetDate} 평균 기온`;
-        document.getElementById('val-meta-1').innerText = `${tempData.avg} ℃`;
-        document.getElementById('lbl-meta-2').innerText = "최저 / 최고 기온";
-        document.getElementById('val-meta-2').innerText = `${tempData.min}℃ / ${tempData.max}℃`;
+        // 하단 텍스트 정보 업데이트
+        document.getElementById('info-temp').innerText = `평균: ${tempInfo.avg}℃ (최저: ${tempInfo.min}℃ / 최고: ${tempInfo.max}℃)`;
+        
+        let totalSum = powerInfo.reduce((a,b)=>a+b, 0);
+        let maxVal = Math.max(...powerInfo);
+        let peakHour = powerInfo.indexOf(maxVal) + 1;
+        document.getElementById('info-power').innerText = `일일 총량: ${totalSum.toLocaleString()} MW (최대 피크: ${maxVal.toLocaleString()} MW / ${peakHour}시)`;
 
-        const totalPower = powerData.reduce((a, b) => a + b, 0);
-        const maxPower = Math.max(...powerData);
-        const maxHour = powerData.indexOf(maxPower) + 1;
-
-        document.getElementById('lbl-meta-3').innerText = "하루 총 전력수요량";
-        document.getElementById('val-meta-3').innerText = `${totalPower.toLocaleString()} MW`;
-        document.getElementById('lbl-meta-4').innerText = "최대 전력 (시간대)";
-        document.getElementById('val-meta-4').innerText = `${maxPower.toLocaleString()} MW (${maxHour}시)`;
-
-        if (chartInstance) chartInstance.destroy();
-
-        let simulatedHourlyTemp = hours.map((_, index) => {
-            let ratio = Math.sin((index - 6) / 24 * 2 * Math.PI) * 0.5 + 0.5;
-            return Math.round((tempData.min + (tempData.max - tempData.min) * ratio) * 10) / 10;
+        // 시간대별 가상 기온 추이선 생성 (최저~최고 기온을 사인곡선으로 매핑하여 분석 고도화)
+        const hoursLabels = Array.from({length: 24}, (_, i) => `${i + 1}시`);
+        let hourlyTempTrend = hoursLabels.map((_, idx) => {
+            let sineRad = Math.sin((idx - 6) / 24 * 2 * Math.PI) * 0.5 + 0.5;
+            return Math.round((tempInfo.min + (tempInfo.max - tempInfo.min) * sineRad) * 10) / 10;
         });
 
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        chartInstance = new Chart(ctx, {
+        if(myChart) myChart.destroy();
+
+        const ctx = document.getElementById('analysisChart').getContext('2d');
+        myChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: hours,
+                labels: hoursLabels,
                 datasets: [
                     {
-                        label: '전력수요량 (MW)',
-                        data: powerData,
-                        borderColor: '#228be6',
-                        backgroundColor: 'rgba(34, 139, 230, 0.1)',
-                        yAxisID: 'y-power',
-                        tension: 0.3,
-                        fill: true
+                        label: '시간별 전력수요량 (MW)',
+                        data: powerInfo,
+                        borderColor: '#3182ce',
+                        backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                        yAxisID: 'y-axis-power',
+                        fill: true,
+                        tension: 0.2
                     },
                     {
-                        label: '추정 시간별 기온 (℃)',
-                        data: simulatedHourlyTemp,
-                        borderColor: '#fa5252',
-                        backgroundColor: '#fa5252',
-                        yAxisID: 'y-temp',
-                        tension: 0.4,
-                        borderDash: [5, 5],
-                        pointRadius: 3
+                        label: '당일 기온 변화 추정 (℃)',
+                        data: hourlyTempTrend,
+                        borderColor: '#e53e3e',
+                        borderDash: [6, 4],
+                        yAxisID: 'y-axis-temp',
+                        pointRadius: 4,
+                        tension: 0.3
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    title: { display: true, text: `${targetDate} 전력수요량 및 기온 추이 (시간별)` }
-                },
                 scales: {
-                    'y-power': {
+                    'y-axis-power': {
                         type: 'linear',
                         position: 'left',
-                        title: { display: true, text: '전력수요량 (MW)' }
+                        title: { display: true, text: '전력수요량 (MW)', font: { weight: 'bold' } }
                     },
-                    'y-temp': {
+                    'y-axis-temp': {
                         type: 'linear',
                         position: 'right',
-                        title: { display: true, text: '기온 (℃)' },
+                        title: { display: true, text: '기온 (℃)', font: { weight: 'bold' } },
                         grid: { drawOnChartArea: false }
                     }
-                }
-            }
-        });
-    }
-
-    function renderScatterPlot() {
-        const targetMonth = document.getElementById('target-month').value;
-        let scatterData = [];
-        let totalDays = 0;
-        let sumTemp = 0;
-        let sumPowerMax = 0;
-
-        Object.keys(tempMap).forEach(date => {
-            if (targetMonth !== 'all' && date.split('-')[1] !== targetMonth) return;
-
-            const powerData = powerMap[date];
-            if (powerData) {
-                const maxPowerOfDay = Math.max(...powerData);
-                const avgTempOfDay = tempMap[date].avg;
-
-                scatterData.push({ x: avgTempOfDay, y: maxPowerOfDay, date: date });
-                sumTemp += avgTempOfDay;
-                sumPowerMax += maxPowerOfDay;
-                totalDays++;
-            }
-        });
-
-        if(scatterData.length === 0) {
-            alert("조건에 부합하는 데이터가 부족합니다.");
-            return;
-        }
-
-        document.getElementById('lbl-meta-1').innerText = "분석 기간 평균 기온";
-        document.getElementById('val-meta-1').innerText = `${(sumTemp / totalDays).toFixed(1)} ℃`;
-        document.getElementById('lbl-meta-2').innerText = "분석 대상 일수";
-        document.getElementById('val-meta-2').innerText = `${totalDays} 일`;
-        document.getElementById('lbl-meta-3').innerText = "평균 일일 최대 전력";
-        document.getElementById('val-meta-3').innerText = `${Math.round(sumPowerMax / totalDays).toLocaleString()} MW`;
-        document.getElementById('lbl-meta-4').innerText = "특이사항";
-        document.getElementById('val-meta-4').innerText = "냉·난방 임계점 확인";
-
-        if (chartInstance) chartInstance.destroy();
-
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        chartInstance = new Chart(ctx, {
-            type: 'scatter',
-            data: {
-                datasets: [{
-                    label: '일일 최고전력 vs 평균기온',
-                    data: scatterData,
-                    backgroundColor: 'rgba(77, 173, 247, 0.7)',
-                    borderColor: '#1c7ed6',
-                    pointRadius: 5
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: { display: true, text: '기온 변동에 따른 전력 피크 수요 분포 (상관관계)' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let raw = context.raw;
-                                return `[${raw.date}] 평균기온: ${raw.x}℃, 최대수요: ${raw.y.toLocaleString()} MW`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { title: { display: true, text: '일평균 기온 (℃)' } },
-                    y: { title: { display: true, text: '당일 최대 전력수요량 (MW)' } }
                 }
             }
         });
